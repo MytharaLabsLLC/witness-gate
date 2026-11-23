@@ -45,7 +45,41 @@ rec = chain.record(subject_id="user-1", emotion="content", intensity=0.4,
 ok, details = chain.verify()
 ```
 
-Tests: `pytest tests/` (47 tests, zero dependencies).
+Tests: `pytest tests/` (zero dependencies).
+
+## Plug-and-play: the Gate wrapper
+
+`panel()` is the judgment core. `soul_cradle/plug.py` is the same pattern
+written once, so an integrator does not re-implement it by hand:
+
+```python
+from soul_cradle.plug import Gate
+
+gate = Gate(operator="billing-service", ledger_path="gate-ledger.jsonl")
+
+@gate.action(evidence=lambda to, amount: {
+    "principal_consent": True,
+    "fully_disclosed": True,
+    "reversible": amount < 500,
+    "deception_involved": False,
+})
+def issue_refund(to, amount):
+    ...
+
+issue_refund(to="customer-9", amount=120)   # judged first, then run
+```
+
+Three steps: create a Gate, decorate the actions that matter, call them.
+The wrapper builds the evidence packet from the call's own arguments,
+calls the panel, enforces the verdict, and seals every judgment in a
+hash-chained ledger (`verify_ledger()` proves it unaltered):
+
+- `clear` — the action runs.
+- `flagged` / `contested` — the action does not run; `HeldForReview` is
+  raised unless an `on_hold` callback (the human decision point) returns
+  an explicit True.
+- `blocked` — the action never runs; `GateBlocked` is raised and no
+  callback can override a critical witness.
 
 ## Design provenance
 
