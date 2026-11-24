@@ -102,15 +102,16 @@ class Gate:
         on_hold: Optional[Callable[[PanelResult, str], bool]] = None,
         default_evidence: Optional[Dict[str, Any]] = None,
         actor: Optional[str] = None,
+        ledger: Optional[str] = None,
     ):
         self.operator = operator
-        self.ledger_path = ledger_path
+        self.ledger_path = ledger_path if ledger_path is not None else ledger
         self.on_hold = on_hold
         self.default_evidence = dict(default_evidence or {})
         self.actor = actor
         self._last_hash = ""
-        if ledger_path and os.path.exists(ledger_path):
-            with open(ledger_path, "r", encoding="utf-8") as fh:
+        if self.ledger_path and os.path.exists(self.ledger_path):
+            with open(self.ledger_path, "r", encoding="utf-8") as fh:
                 for line in fh:
                     line = line.strip()
                     if line:
