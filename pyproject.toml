@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soulcradle"
+dynamic = ["version"]
+description = "Witness Gate SDK: eight evidence-fed assessors that judge an AI agent's actions before they run, with dissent preserved and every judgment sealed in a tamper-evident record."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+authors = [{ name = "Mythara Labs LLC" }]
+keywords = ["ai-governance", "agent-safety", "audit", "accountability"]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/MytharaLabsLLC/witness-gate"
+
+[project.scripts]
+witness-gate = "soul_cradle.gate_server:main"
+witness-gate-mcp = "soul_cradle.mcp_server:main"
+witness-gate-review = "soul_cradle.review:main"
+witness-gate-review-web = "soul_cradle.review_web:main"
+witness-gate-export = "soul_cradle.export:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "soul_cradle.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["soul_cradle*"]
