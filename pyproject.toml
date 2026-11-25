@@ -22,6 +22,7 @@ witness-gate-mcp = "soul_cradle.mcp_server:main"
 witness-gate-review = "soul_cradle.review:main"
 witness-gate-review-web = "soul_cradle.review_web:main"
 witness-gate-export = "soul_cradle.export:main"
+witness-gate-anchor = "soul_cradle.anchor:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "soul_cradle.__version__" }
