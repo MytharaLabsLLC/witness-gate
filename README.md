@@ -7,7 +7,7 @@ the action first, against evidence, and seals the verdict in a
 hash-chained record that never leaves your building. A block cannot be
 overridden by the caller, the framework, or a callback.
 
-**Measured, not promised:** 74 tests passing, in CI on Python 3.10,
+**Measured, not promised:** 86 tests passing, in CI on Python 3.10,
 3.11, and 3.12 · a 12-packet adversarial battery with zero escapes ·
 sub-millisecond judgments (see *Proof, measured*) · zero dependencies ·
 Apache-2.0.
@@ -105,10 +105,11 @@ pip install git+https://github.com/MytharaLabsLLC/witness-gate
 ```
 
 That installs the `soul_cradle` package (the Gate, the panel, the
-ledger tools) plus five commands: `witness-gate` (the HTTP service),
+ledger tools) plus six commands: `witness-gate` (the HTTP service),
 `witness-gate-mcp` (the MCP server), `witness-gate-review` and
-`witness-gate-review-web` (the review consoles), and
-`witness-gate-export` (the ledger exporter). `examples/quickstart.py`
+`witness-gate-review-web` (the review consoles),
+`witness-gate-export` (the ledger exporter), and
+`witness-gate-anchor` (the ledger anchor). `examples/quickstart.py`
 is the whole SDK in one file: decorate, call, done. A separate Gate
 instance per agent gives each agent its own operator name, ledger,
 and default evidence; that is the per-agent policy surface.
@@ -172,6 +173,33 @@ sealed ledger into the formats a logging or SIEM stack already eats,
 including OpenTelemetry-style log records. The chain is verified
 before anything is exported; a tampered ledger exports nothing.
 
+## Anchoring the ledger
+
+The hash chain catches edits to entries. It cannot, by itself, catch
+a full rewrite: someone with write access to the ledger file could
+regenerate the whole chain from scratch, and the new chain would
+verify, because verification only asks whether the file agrees with
+itself. Anchoring closes that. An anchor is a small record of the
+ledger's state at one moment (entry count and head hash), kept in a
+separate file, chained to the anchors before it, and signed with an
+operator key (HMAC-SHA256) that never lives in the ledger:
+
+```bash
+witness-gate-anchor init-key --key-file anchor.key
+witness-gate-anchor create gate-ledger.jsonl --key-file anchor.key
+witness-gate-anchor verify gate-ledger.jsonl --key-file anchor.key
+```
+
+A rewritten ledger produces a head that matches no signed anchor,
+and forging an anchor requires the key. Keep the key somewhere the
+ledger writer cannot reach; for the strongest form, also pin the
+latest anchor hash (`witness-gate-anchor show`) somewhere public or
+third-party. Anchoring is periodic: entries after the last anchor
+ride on the chain alone until the next one, and `verify` reports
+that tail honestly instead of failing it. An anchor proves the
+ledger at its entry count is the ledger the key holder saw. Like
+the chain, it proves unaltered, not true.
+
 ## Proof, measured
 
 Reproduce both numbers with the scripts in this repo:
@@ -187,7 +215,7 @@ Reproduce both numbers with the scripts in this repo:
   high variance, hidden costs, and more). Both critical packets were
   blocked, every other broken packet was held, the baseline cleared:
   12 of 12 behaved as required, zero escapes.
-* Test suite: 74 tests, all passing.
+* Test suite: 86 tests, all passing.
 
 ## Cost and versioning
 
