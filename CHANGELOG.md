@@ -14,7 +14,21 @@ neither the package version nor the rubric version.
 A release that changes any verdict behavior says so in its entry, in
 plain words, before anything else.
 
-## 2026.1 (unreleased)
+## 2026.2 (2026-11-25)
+
+- Ledger anchoring (`soul_cradle.anchor`, `witness-gate-anchor`):
+  the ledger's hash chain catches edits to entries, but a full
+  rewrite of the file would regenerate a self-consistent chain.
+  An anchor pins the ledger's entry count and head hash in a
+  separate file, chained to prior anchors and signed with an
+  operator key (HMAC-SHA256) kept apart from the ledger, so a
+  rewritten or truncated ledger matches no signed anchor. Creating
+  an anchor refuses a ledger whose chain does not verify, and
+  verification reports entries past the last anchor as an
+  unanchored tail rather than failing them. No verdict behavior
+  changes; the judging core is untouched.
+
+## 2026.1 (2026-11-24)
 
 The first SDK release: the Gate as an installable, callable package.
 
