@@ -14,6 +14,39 @@ neither the package version nor the rubric version.
 A release that changes any verdict behavior says so in its entry, in
 plain words, before anything else.
 
+## 2026.3 (2026-11-26)
+
+Corrections only; no verdict behavior changes. The judging core, the
+rubrics, and every verdict the panel can return are exactly as in
+2026.2. What changed is that three places where the documentation,
+and one export, disagreed with the shipped behavior now agree with
+it. All three were found by a full function test of the package
+against its own documentation.
+
+- The quick-start example in README.md and in the `soul_cradle.plug`
+  module docstring showed a four-key evidence packet and promised
+  the decorated function would run, judged first, then run. That
+  packet in fact returns `contested` and raises `HeldForReview`;
+  the function never runs. The examples now pass the complete
+  evidence packet, in the style of `examples/quickstart.py`, and
+  run as documented.
+- The claim "missing evidence fails closed" was stated without its
+  condition in README.md, in the `soul_cradle.evidence` docstring,
+  and in the `witness_gate_assess` MCP tool description. The shipped
+  behavior, now stated everywhere the claim appears: fail-closed
+  applies per assessor once the evidence engages that assessor (at
+  least one of its evidence keys present), and a packet that
+  engages no assessor is cleared by universal abstention.
+- `soul_cradle.export.to_csv` read `assessor_id` and `verdict` keys
+  that panel dissent entries do not carry, so the dissent column of
+  a CSV export rendered as `None:None` for every dissenting entry.
+  It now renders the dissent from the keys the panel actually
+  records (`flagged_by`, the finding's `check_id`, `severity`, and
+  `observed` value, `finding_count`, `cleared_by`, `abstained`),
+  and the test suite asserts the dissent content of a CSV export.
+- The `soul_cradle.plug` docstring named a `BlockedByGate`
+  exception; the exception is `GateBlocked`. Corrected.
+
 ## 2026.2 (2026-11-25)
 
 - Ledger anchoring (`soul_cradle.anchor`, `witness-gate-anchor`):

@@ -12,13 +12,13 @@ overridden by the caller, the framework, or a callback.
 sub-millisecond judgments (see *Proof, measured*) · zero dependencies ·
 Apache-2.0.
 
-An accountable-AI trust layer: **eight fail-closed evidence-fed witness assessors**, **tamper-evident hash-chained attestation records**, and a **preserved dissent panel**. Self-contained Python, standard library only.
+An accountable-AI trust layer: **eight evidence-fed witness assessors** (fail-closed on the evidence that engages them, abstaining where it does not), **tamper-evident hash-chained attestation records**, and a **preserved dissent panel**. Self-contained Python, standard library only.
 
 ## What it is
 
 A gate that sits between an AI agent's proposed action and the action itself:
 
-1. **Eight witnesses** (`soul_cradle/assessors.py`) — each a versioned rubric over *observable evidence* about a proposed action. Each assessor reads only the evidence keys its rubric declares, **abstains when its domain is not engaged** (humility, not guessing), **flags with the evidence cited** when a check fails or evidence is missing (fail-closed), and **seals every judgment with a content hash**.
+1. **Eight witnesses** (`soul_cradle/assessors.py`) — each a versioned rubric over *observable evidence* about a proposed action. Each assessor reads only the evidence keys its rubric declares, **abstains when its domain is not engaged** (humility, not guessing), **flags with the evidence cited** when a check fails or when evidence an engaged assessor needs is missing (fail-closed: an assessor is engaged once at least one of its evidence keys is present, and from that point missing evidence is itself a finding, never a pass; a packet that engages no assessor at all is cleared by universal abstention, because no witness had a domain in the matter), and **seals every judgment with a content hash**.
 2. **The emotional chain** (`soul_cradle/emotional_chain.py`) — a tamper-evident chain of witness-attested records. Every entry carries the witnesses' sealed judgments chained alongside it. Disagreement is **preserved, never averaged away**.
 3. **The standing matrix** (`soul_cradle/standing.py`) — structural law for who may declare what: the wronged declares trespass, a witness declares only what it observed, a stranger declares nothing. Declarations are HMAC-signed, timestamped, and auditable.
 
@@ -50,6 +50,15 @@ gate = Gate(operator="billing-service", ledger_path="gate-ledger.jsonl")
     "fully_disclosed": True,
     "reversible": amount < 500,
     "deception_involved": False,
+    "affected_parties": [to],
+    "disproportionate_harm": False,
+    "contradicts_commitments": False,
+    "sustains_long_term": True,
+    "hidden_costs_addressed": True,
+    "safe_on_repetition": True,
+    "strengthens_relationship": True,
+    "precedent_setting": False,
+    "variance": "low",
 })
 def issue_refund(to, amount):
     ...
@@ -62,7 +71,8 @@ The wrapper builds the evidence packet from the call's own arguments,
 calls the panel, enforces the verdict, and seals every judgment in a
 hash-chained ledger (`verify_ledger()` proves it unaltered):
 
-- `clear` — the action runs.
+- `clear` — the action runs. (This includes the case where the evidence
+  engaged no assessor and every witness abstained.)
 - `flagged` / `contested` — the action does not run; `HeldForReview` is
   raised unless an `on_hold` callback (the human decision point) returns
   an explicit True.
@@ -149,8 +159,10 @@ derives what can be derived: consent is looked up in an append-only
 ConsentBook rather than asserted by the caller, reversibility is
 derived from the action type (sending, deleting, and paying do not
 undo), and affected parties are pulled from the call arguments. What
-cannot be derived is still supplied by the caller, and the panel
-fails closed when it is missing.
+cannot be derived is still supplied by the caller, and for every
+assessor the packet engages, missing evidence fails closed when it is
+missing: it becomes a finding, not a pass. A packet that engages no
+assessor at all is cleared by universal abstention.
 
 ## The review console
 
