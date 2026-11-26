@@ -14,6 +14,43 @@ neither the package version nor the rubric version.
 A release that changes any verdict behavior says so in its entry, in
 plain words, before anything else.
 
+## 2026.4 (2026-11-26)
+
+An addition, not a correction. Verdict behavior is unchanged for
+any gate that does not configure a policy pack: the built-in
+rubrics, the panel logic, and every verdict of 2026.3 are exactly
+as they were. For a gate that does configure a pack, verdicts can
+only move in one direction, toward more findings, never fewer.
+
+- New module `soul_cradle.policy`: customer policy packs. A pack
+  is a JSON file of rules (one of the eight witnesses, one evidence
+  key, one operator, one severity, one finding text) that judge
+  alongside the built-in rubric as data, with no code changes.
+  Operators: equals, not_equals, in, not_in, exists, missing, gt,
+  gte, lt, lte, contains. Policy findings are marked in the result
+  with check_id `policy:<pack>:<rule id>` and flow through the
+  existing panel verdict logic.
+- The floor is not negotiable, by construction: a pack can only
+  add findings. It cannot suppress, clear, or downgrade a built-in
+  finding, there is no pack syntax for removing a built-in check,
+  and the three built-in criticals block regardless of any pack.
+- Loading fails closed: strict validation (malformed JSON, unknown
+  assessor or operator, bad severity, duplicate rule id, misused
+  value) raises `PolicyError`, and a `Gate` configured with a pack
+  that cannot load refuses to be constructed.
+- `Gate` gains an optional `policy` argument (file path, dict, or
+  loaded `PolicyPack`). Every entry sealed by a gate carrying a
+  pack records the pack's name, version, and the sha256 of its
+  canonical form, inside the sealed body. Ledgers written before
+  this release verify unchanged, policy-era entries verify, and a
+  chain can continue across the boundary; all three directions
+  are covered by tests in `tests/test_policy.py`, including a
+  fixture ledger sealed by the 2026.3 code.
+- Worked example: `examples/customer-policy.json` (a fictional
+  regulated shop) and `examples/policy_quickstart.py`, which runs
+  a clear, a policy block, and a built-in floor block end to end.
+  README gains a "Bring your own law" section.
+
 ## 2026.3 (2026-11-26)
 
 Corrections only; no verdict behavior changes. The judging core, the

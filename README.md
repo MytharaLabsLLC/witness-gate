@@ -124,6 +124,61 @@ is the whole SDK in one file: decorate, call, done. A separate Gate
 instance per agent gives each agent its own operator name, ledger,
 and default evidence; that is the per-agent policy surface.
 
+## Bring your own law
+
+The gate ships with Mythara's rubric as the floor. A policy pack
+adds your organization's own rules on top of that floor, as data,
+with no code changes: a JSON file of rules, each naming one of the
+eight witnesses, one evidence key, one operator, and a severity.
+
+```json
+{
+  "pack": "harborlight-claims",
+  "version": "1.0",
+  "rules": [
+    {"id": "data-residency", "assessor": "nemesis",
+     "key": "data_residency", "op": "not_equals",
+     "value": "on_premises", "severity": "critical",
+     "finding": "Claimant data must stay on premises."}
+  ]
+}
+```
+
+Pass the pack when you build the Gate, by file path, dict, or a
+loaded `PolicyPack`:
+
+```python
+gate = Gate(operator="claims-service", ledger_path="gate-ledger.jsonl",
+            policy="customer-policy.json")
+```
+
+When a rule's condition matches the evidence, its witness raises a
+finding, marked `policy:<pack>:<rule id>`, and the finding flows
+through the panel like any other: a critical blocks, lesser findings
+flag or contest. Operators: `equals`, `not_equals`, `in`, `not_in`,
+`exists`, `missing`, `gt`, `gte`, `lt`, `lte`, `contains`.
+
+Three properties hold by construction:
+
+- **The floor is not negotiable.** A pack can only add findings. It
+  can never suppress, clear, or downgrade a built-in finding, and
+  there is no pack syntax for removing a built-in check. The three
+  built-in criticals (deception under eros and hermes, disproportionate
+  harm under nemesis) block regardless of any pack. A pack can
+  tighten; it can never loosen.
+- **Loading fails closed.** Validation is strict: malformed JSON, an
+  unknown assessor or operator, a bad severity, or a duplicate rule
+  id raises `PolicyError`, and a Gate configured with a pack that
+  cannot load refuses to be constructed rather than judge bare.
+- **Every judgment names its law.** Packs are versioned, and every
+  entry a pack touches is sealed into the ledger with the pack's
+  name, version, and the sha256 of its canonical form, so any
+  judgment can later be tied to the exact rules that were applied.
+
+A complete worked example, a fictional regulated shop with residency,
+transfer-threshold, consent, and sanctioned-destination rules, lives
+in `examples/customer-policy.json` and `examples/policy_quickstart.py`.
+
 ## Call it from any stack
 
 Python is one caller among many. Run the gate once inside your own
