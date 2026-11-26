@@ -438,6 +438,7 @@ def panel(
     action_description: str,
     evidence: Dict[str, Any],
     assessor_ids: Optional[List[str]] = None,
+    policy: Optional[Any] = None,
 ) -> PanelResult:
     """Hear all (or selected) assessors on one action.
 
@@ -446,9 +447,35 @@ def panel(
     "flagged"; some flagged and some cleared -> "contested" (the
     disagreement is reported in full); none flagged -> "clear".
     Assessors that abstain do not count for or against.
+
+    policy: an optional soul_cradle.policy.PolicyPack. Its rules are
+    evaluated against the same evidence, and each matching rule adds
+    a finding to the judgment of the witness the rule names (marked
+    with check_id "policy:<pack>:<rule id>"), before the verdict is
+    computed, so policy findings flow through the same verdict logic
+    as built-in findings. A witness the built-in rubric left abstaining
+    or clear is flagged when the customer's law engages it. Policy can
+    only add findings; built-in judgments are never altered except by
+    appending policy findings to them, and each touched judgment is
+    re-sealed so its integrity hash still verifies.
     """
     ids = assessor_ids or list(ASSESSORS)
     judgments = [consult(aid, action_description, evidence) for aid in ids]
+    if policy is not None:
+        policy_findings = policy.evaluate(evidence)
+        for j in judgments:
+            extra = policy_findings.get(j.assessor_id)
+            if not extra:
+                continue
+            j.findings = list(j.findings) + extra
+            if j.verdict in (ABSTAIN, CLEAR):
+                j.verdict = FLAGGED
+            j.note = (
+                f"{j.note} Customer policy pack '{policy.name}' "
+                f"v{policy.version} added {len(extra)} finding(s) "
+                "under this witness."
+            )
+            _seal(j)
     engaged = [j for j in judgments if j.verdict != ABSTAIN]
     flagged = [j for j in engaged if j.verdict == FLAGGED]
     cleared = [j for j in engaged if j.verdict == CLEAR]

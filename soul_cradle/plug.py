@@ -49,6 +49,14 @@ carries the hash of the entry before it, so a quietly edited history
 fails verify_ledger(). The chain proves the record is unaltered. It
 does not prove the record is true.
 
+A Gate can also carry the customer's own law: pass policy= with a
+policy pack file path, dict, or loaded PolicyPack (see
+soul_cradle.policy). The pack's rules judge alongside the built-in
+rubric, and every sealed entry records the pack's name, version, and
+sha256, so the judgment can later be tied to the exact law applied.
+A pack that cannot load raises PolicyError at construction: the gate
+refuses to exist rather than judge without the customer's law.
+
 Standard library only, like the rest of the package. Sync and async
 functions are both supported.
 """
@@ -71,6 +79,7 @@ from .assessors import (
     PanelResult,
     panel,
 )
+from .policy import PolicyError, PolicyPack, load_policy
 
 EvidenceSource = Union[Dict[str, Any], Callable[..., Dict[str, Any]], None]
 
@@ -112,12 +121,16 @@ class Gate:
         default_evidence: Optional[Dict[str, Any]] = None,
         actor: Optional[str] = None,
         ledger: Optional[str] = None,
+        policy: Union[str, Dict[str, Any], PolicyPack, None] = None,
     ):
         self.operator = operator
         self.ledger_path = ledger_path if ledger_path is not None else ledger
         self.on_hold = on_hold
         self.default_evidence = dict(default_evidence or {})
         self.actor = actor
+        # Fail closed at configuration time: a pack that cannot load
+        # raises PolicyError here, so this gate never judges bare.
+        self.policy_pack = load_policy(policy) if policy is not None else None
         self._last_hash = ""
         if self.ledger_path and os.path.exists(self.ledger_path):
             with open(self.ledger_path, "r", encoding="utf-8") as fh:
@@ -139,7 +152,7 @@ class Gate:
         merged.update(evidence or {})
         if self.actor and "actor" not in merged:
             merged["actor"] = self.actor
-        result = panel(description, merged)
+        result = panel(description, merged, policy=self.policy_pack)
         self._seal(description, merged, result)
         return result
 
@@ -228,6 +241,12 @@ class Gate:
             "result": result.to_dict(),
             "prev_hash": self._last_hash,
         }
+        if self.policy_pack is not None:
+            # The pack identity is part of the sealed body, added
+            # before hashing, so verify_ledger covers it exactly like
+            # every other field. Entries sealed without a pack carry
+            # no "policy" key and verify as they always have.
+            entry["policy"] = self.policy_pack.identity()
         entry["hash"] = hashlib.sha256(
             self._last_hash.encode() + _canonical(entry)
         ).hexdigest()
