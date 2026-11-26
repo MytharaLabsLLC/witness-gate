@@ -15,4 +15,4 @@ __all__ = [
     "assessors", "emotional_chain", "standing",
     "Gate", "GateBlocked", "HeldForReview", "verify_ledger",
 ]
-__version__ = "2026.2"
+__version__ = "2026.3"

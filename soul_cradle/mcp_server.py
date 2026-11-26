@@ -49,7 +49,9 @@ TOOL = {
         "blocked (a critical finding; refuse the action, no override). "
         "Evidence is a dict of observable facts about the action; the "
         "core keys are principal_consent, fully_disclosed, reversible, "
-        "and deception_involved. Missing evidence fails closed."
+        "and deception_involved. For every assessor the evidence "
+        "engages, missing evidence fails closed; a packet that "
+        "engages no assessor is cleared by universal abstention."
     ),
     "inputSchema": {
         "type": "object",

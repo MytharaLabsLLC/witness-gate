@@ -16,6 +16,15 @@ This module is that pattern, written once:
         "fully_disclosed": True,
         "reversible": amount < 500,
         "deception_involved": False,
+        "affected_parties": [to],
+        "disproportionate_harm": False,
+        "contradicts_commitments": False,
+        "sustains_long_term": True,
+        "hidden_costs_addressed": True,
+        "safe_on_repetition": True,
+        "strengthens_relationship": True,
+        "precedent_setting": False,
+        "variance": "low",
     })
     def issue_refund(to, amount):
         ...
@@ -30,7 +39,7 @@ Enforcement, exactly as the panel defines it:
                  is the human decision point and only its explicit True
                  lets the action run.
 - "contested" -> same as flagged. The dissent is in the result.
-- "blocked"   -> the action never runs. BlockedByGate is raised.
+- "blocked"   -> the action never runs. GateBlocked is raised.
                  No callback can override a block: one critical witness
                  is enough, and the panel does not outvote it.
 

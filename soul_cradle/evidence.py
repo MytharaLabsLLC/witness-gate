@@ -14,8 +14,12 @@ where the evidence comes from. This module derives what can be derived:
   customer_id, user, account) instead of being restated by hand.
 
 What cannot be derived (deception, disclosure, long-term effect) is
-still supplied by the caller, and the panel fails closed when it is
-missing. Derivation narrows the caller's say; it does not remove it.
+still supplied by the caller, and for every assessor the packet
+engages, missing evidence fails closed when it is missing. (An
+assessor is engaged once at least one of its evidence keys is
+present; a packet that engages no assessor is cleared by universal
+abstention.) Derivation narrows the caller's say; it does not remove
+it.
 """
 
 from __future__ import annotations

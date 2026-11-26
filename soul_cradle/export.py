@@ -30,6 +30,35 @@ def to_json(entries: list[dict]) -> str:
     return json.dumps(entries, indent=2)
 
 
+def _format_dissent(dissent: list[dict]) -> str:
+    """Render the panel's dissent entries from the keys they carry.
+
+    Each entry records who flagged (flagged_by), the finding that
+    led (check_id, severity, observed), how many findings that
+    assessor raised (finding_count), and who cleared or abstained
+    (cleared_by, abstained).
+    """
+    parts = []
+    for d in dissent:
+        finding = d.get("finding") or {}
+        text = (
+            f"{d.get('flagged_by')} flagged {finding.get('check_id')} "
+            f"(severity {finding.get('severity')}, "
+            f"observed {finding.get('observed')!r})"
+        )
+        count = d.get("finding_count")
+        if count and count > 1:
+            text += f"; {count} findings"
+        cleared_by = d.get("cleared_by") or []
+        if cleared_by:
+            text += f"; cleared by {', '.join(cleared_by)}"
+        abstained = d.get("abstained") or []
+        if abstained:
+            text += f"; abstained {', '.join(abstained)}"
+        parts.append(text)
+    return " | ".join(parts)
+
+
 def to_csv(entries: list[dict]) -> str:
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -37,9 +66,7 @@ def to_csv(entries: list[dict]) -> str:
                      "dissent", "entry_hash"])
     for e in entries:
         r = e["result"]
-        dissent = "; ".join(
-            f"{d.get('assessor_id')}:{d.get('verdict')}"
-            for d in r.get("dissent", []))
+        dissent = _format_dissent(r.get("dissent", []))
         writer.writerow([e["ts"], e["operator"], e["action"],
                          r["verdict"], r.get("note", ""), dissent,
                          e["hash"]])
