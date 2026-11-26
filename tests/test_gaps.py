@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 
 import pytest
@@ -72,7 +74,35 @@ def test_exports(tmp_path):
     assert len(json.loads(to_json(entries))) == 2
     csv_text = to_csv(entries)
     assert "flagged" in csv_text and "blocked" in csv_text
+    assert "None:None" not in csv_text
     otlp = json.loads(to_otlp(entries))
     records = otlp["resourceLogs"][0]["scopeLogs"][0]["logRecords"]
     assert len(records) == 2
     assert records[1]["severityText"] == "ERROR"
+
+
+def test_csv_export_carries_the_dissent(tmp_path):
+    from soul_cradle.review import read_ledger
+    path = str(tmp_path / "ledger.jsonl")
+    gate = Gate(operator="test", ledger_path=path)
+    packet = {
+        "principal_consent": True, "fully_disclosed": True,
+        "reversible": True, "deception_involved": False,
+        "affected_parties": ["customer"], "disproportionate_harm": False,
+        "contradicts_commitments": False, "sustains_long_term": True,
+        "hidden_costs_addressed": True, "safe_on_repetition": True,
+        "strengthens_relationship": True, "precedent_setting": False,
+        "variance": "high",
+    }
+    result = gate.check("high variance refund", packet)
+    assert result.verdict == "contested"
+    csv_text = to_csv(read_ledger(path))
+    assert "None:None" not in csv_text
+    rows = list(csv.DictReader(io.StringIO(csv_text)))
+    assert len(rows) == 1
+    dissent_cell = rows[0]["dissent"]
+    # The cell names the dissent the panel actually recorded: who
+    # flagged, on what check, and who cleared the same action.
+    assert "dionysus" in dissent_cell
+    assert "dionysus.variance" in dissent_cell
+    assert "demeter" in dissent_cell
