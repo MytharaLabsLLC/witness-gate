@@ -9,12 +9,14 @@ No external dependencies beyond the Python standard library.
 """
 
 from . import assessors, emotional_chain, standing
-from .plug import Gate, GateBlocked, HeldForReview, verify_ledger
+from .plug import (Gate, GateBlocked, HeldForReview, verify_ledger,
+                   verify_ledger_detailed)
 from .policy import PolicyError, PolicyPack, load_policy
 
 __all__ = [
     "assessors", "emotional_chain", "standing",
     "Gate", "GateBlocked", "HeldForReview", "verify_ledger",
+    "verify_ledger_detailed",
     "PolicyError", "PolicyPack", "load_policy",
 ]
-__version__ = "2026.4"
+__version__ = "2026.5"

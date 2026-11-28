@@ -15,11 +15,25 @@ witnesses:
 
     GET /health   -> {"ok": true, "service": "witness-gate"}
     GET /rubrics  -> every assessor rubric, version, and source
+    GET /policy   -> the policy pack this server applies, if any
+
+Customer policy packs (see soul_cradle.policy) work here exactly as
+they do in the Python API, in two ways. Start the server with
+--policy pack.json and that pack judges every request. Or send one
+pack as a JSON object in a single request's "policy" field and it
+judges that request only, replacing any server pack for that call.
+Policy findings carry "policy:<pack>:<rule>" check ids, the applied
+pack's name, version, and sha256 are reported in the response's
+"policy" field and sealed into the ledger entry, and an invalid pack
+fails closed: a bad --policy file stops the server from starting, and
+a bad per-request pack gets a 400 with nothing judged. A pack is
+accepted only as a JSON object, never as a file path; the server does
+not read files on a caller's say-so.
 
 Run it inside your own environment:
 
     python -m soul_cradle.gate_server --port 8765 \
-        --ledger gate-ledger.jsonl
+        --ledger gate-ledger.jsonl --policy customer-policy.json
 
 It binds to 127.0.0.1 by default. Widen --host only on a network you
 control: whoever can reach this port can ask for judgments. Every
@@ -36,16 +50,40 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 
 from .assessors import rubric_inventory
 from .plug import Gate
+from .policy import PolicyError
 
 SERVICE = "witness-gate"
 
 
+def _scoped_gate(base: Gate, policy) -> Gate:
+    """A gate identical to base but carrying the given policy pack.
+
+    Construction validates the pack through load_policy, so a bad
+    pack raises PolicyError here and no judgment is ever issued
+    without the law that was asked for.
+    """
+    return Gate(
+        operator=base.operator,
+        ledger_path=base.ledger_path,
+        on_hold=base.on_hold,
+        default_evidence=base.default_evidence,
+        actor=base.actor,
+        policy=policy,
+    )
+
+
 def make_handler(gate: Gate):
+    # One lock around gate resolution and judgment: a per-request
+    # gate seals into the same ledger as the server gate, and the
+    # hash chain only stays truthful if seals never interleave.
+    lock = threading.Lock()
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -65,6 +103,12 @@ def make_handler(gate: Gate):
                 self._send(200, {"ok": True, "service": SERVICE})
             elif self.path == "/rubrics":
                 self._send(200, {"rubrics": rubric_inventory()})
+            elif self.path == "/policy":
+                pack = gate.policy_pack
+                self._send(200, {
+                    "service": SERVICE,
+                    "policy": pack.identity() if pack is not None else None,
+                })
             else:
                 self._send(404, {"error": "not found"})
 
@@ -83,9 +127,24 @@ def make_handler(gate: Gate):
             except Exception as exc:
                 self._send(400, {"error": f"bad request: {exc}"})
                 return
-            result = gate.check(action, evidence)
+            with lock:
+                judge = gate
+                if "policy" in body:
+                    pack = body["policy"]
+                    if not isinstance(pack, dict):
+                        self._send(400, {"error": "bad request: policy must "
+                                                  "be a policy pack object"})
+                        return
+                    try:
+                        judge = _scoped_gate(gate, pack)
+                    except PolicyError as exc:
+                        self._send(400, {"error": f"invalid policy pack: {exc}"})
+                        return
+                result = judge.check(action, evidence)
             payload = result.to_dict()
             payload["service"] = SERVICE
+            pack = judge.policy_pack
+            payload["policy"] = pack.identity() if pack is not None else None
             self._send(200, payload)
 
     return Handler
@@ -104,11 +163,21 @@ def main(argv=None):
     parser.add_argument("--ledger", default=None,
                         help="path to the sealed judgment ledger (JSONL)")
     parser.add_argument("--operator", default="gate-server")
+    parser.add_argument("--policy", default=None,
+                        help="path to a customer policy pack (JSON) "
+                             "applied to every judgment")
     args = parser.parse_args(argv)
-    gate = Gate(operator=args.operator, ledger_path=args.ledger)
+    try:
+        gate = Gate(operator=args.operator, ledger_path=args.ledger,
+                    policy=args.policy)
+    except PolicyError as exc:
+        # Fail closed: no law loaded, no server. A gate that cannot
+        # load its pack must never come up judging bare.
+        print(f"{SERVICE}: refusing to start: {exc}", file=sys.stderr)
+        sys.exit(2)
     server = serve(args.host, args.port, gate)
     print(f"{SERVICE} listening on http://{args.host}:{args.port} "
-          f"(POST /assess, GET /health, GET /rubrics)")
+          f"(POST /assess, GET /health, GET /rubrics, GET /policy)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

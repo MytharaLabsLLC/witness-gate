@@ -69,7 +69,7 @@ import inspect
 import json
 import os
 import time
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .assessors import (
     PANEL_BLOCKED,
@@ -255,21 +255,65 @@ class Gate:
         self._last_hash = entry["hash"]
 
 
+def _chain_break(entries: List[Dict[str, Any]]) -> Optional[tuple]:
+    """Walk parsed entries the way verify_ledger always has.
+
+    Returns (index, reason) for the first entry that breaks the
+    chain, or None when the chain is intact. This is the single
+    chain computation for the package: verify_ledger and
+    verify_ledger_detailed both read their verdict from it, so the
+    two can never disagree.
+    """
+    prev = ""
+    for i, entry in enumerate(entries):
+        if entry.get("prev_hash") != prev:
+            return i, "prev_hash does not match the previous entry's hash"
+        claimed = entry.get("hash", "")
+        body = {k: v for k, v in entry.items() if k != "hash"}
+        actual = hashlib.sha256(prev.encode() + _canonical(body)).hexdigest()
+        if actual != claimed:
+            return i, "entry hash does not match the entry's contents"
+        prev = claimed
+    return None
+
+
 def verify_ledger(ledger_path: str) -> bool:
     """Recompute the hash chain. False means the record was altered."""
-    prev = ""
+    entries = []
     with open(ledger_path, "r", encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if not line:
                 continue
-            entry = json.loads(line)
-            if entry.get("prev_hash") != prev:
-                return False
-            claimed = entry.get("hash", "")
-            body = {k: v for k, v in entry.items() if k != "hash"}
-            actual = hashlib.sha256(prev.encode() + _canonical(body)).hexdigest()
-            if actual != claimed:
-                return False
-            prev = claimed
-    return True
+            entries.append(json.loads(line))
+    return _chain_break(entries) is None
+
+
+def verify_ledger_detailed(ledger_path: str) -> Dict[str, Any]:
+    """Verify the chain and say where it breaks.
+
+    Returns a dict: ok (bool), entries (count of entries read),
+    break_index (0-based index of the first entry that fails, or
+    None), and reason (plain language, empty when ok). A line that
+    is not valid JSON counts as a break at that line's index.
+    Same chain math as verify_ledger, via _chain_break.
+    """
+    entries = []
+    with open(ledger_path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                return {"ok": False, "entries": len(entries),
+                        "break_index": len(entries),
+                        "reason": "line is not valid JSON"}
+    brk = _chain_break(entries)
+    if brk is None:
+        return {"ok": True, "entries": len(entries),
+                "break_index": None, "reason": ""}
+    index, reason = brk
+    return {"ok": False, "entries": len(entries),
+            "break_index": index, "reason": reason}

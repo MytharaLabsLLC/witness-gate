@@ -15,9 +15,22 @@ consequential action; the panel's verdict comes back as the tool
 result, and every judgment is sealed in the ledger when one is
 configured.
 
+Customer policy packs (see soul_cradle.policy) work here exactly as
+they do in the Python API, in two ways. Start the server with
+--policy pack.json and that pack judges every witness_gate_assess
+call. Or pass one pack as a JSON object in a single call's "policy"
+argument and it judges that call only, replacing any server pack for
+that call. Policy findings carry "policy:<pack>:<rule>" check ids,
+the applied pack's name, version, and sha256 are reported in the
+result's "policy" field and sealed into the ledger entry, and an
+invalid pack fails closed: a bad --policy file stops the server from
+starting, and a bad per-call pack returns a tool error with nothing
+judged.
+
 Run it:
 
-    python -m soul_cradle.mcp_server --ledger gate-ledger.jsonl
+    python -m soul_cradle.mcp_server --ledger gate-ledger.jsonl \
+        --policy customer-policy.json
 
 Point your framework's MCP configuration at that command. The server
 speaks newline-delimited JSON-RPC on stdin/stdout and nothing else;
@@ -34,6 +47,7 @@ import sys
 
 from .assessors import rubric_inventory
 from .plug import Gate, verify_ledger
+from .policy import PolicyError
 from .review import holds
 
 PROTOCOL_VERSION = "2024-11-05"
@@ -60,6 +74,13 @@ TOOL = {
                        "description": "What the agent proposes to do."},
             "evidence": {"type": "object",
                          "description": "Observable facts about the action."},
+            "policy": {"type": "object",
+                       "description": "Optional customer policy pack "
+                                      "(a JSON object with pack, version, "
+                                      "and rules) applied to this judgment "
+                                      "only, replacing any pack the server "
+                                      "was started with. An invalid pack "
+                                      "is an error and nothing is judged."},
         },
         "required": ["action"],
     },
@@ -158,7 +179,30 @@ class McpServer:
             if not isinstance(action, str) or not isinstance(evidence, dict):
                 return self._error(
                     "action must be a string, evidence an object")
-            return self._payload(self.gate.check(action, evidence).to_dict())
+            judge = self.gate
+            if "policy" in args:
+                pack = args["policy"]
+                if not isinstance(pack, dict):
+                    return self._error(
+                        "policy must be a policy pack object")
+                try:
+                    # Same gate, one call only, carrying this pack.
+                    # Construction validates the pack, so a bad pack
+                    # raises here and nothing is judged without it.
+                    judge = Gate(
+                        operator=self.gate.operator,
+                        ledger_path=self.gate.ledger_path,
+                        on_hold=self.gate.on_hold,
+                        default_evidence=self.gate.default_evidence,
+                        actor=self.gate.actor,
+                        policy=pack,
+                    )
+                except PolicyError as exc:
+                    return self._error(f"invalid policy pack: {exc}")
+            payload = judge.check(action, evidence).to_dict()
+            pack = judge.policy_pack
+            payload["policy"] = pack.identity() if pack is not None else None
+            return self._payload(payload)
         if name == "witness_gate_rubrics":
             return self._payload(rubric_inventory())
         if name in ("witness_gate_verify_ledger", "witness_gate_review_queue"):
@@ -190,9 +234,19 @@ def main(argv=None):
     parser.add_argument("--ledger", default=None,
                         help="path to the sealed judgment ledger (JSONL)")
     parser.add_argument("--operator", default="mcp-server")
+    parser.add_argument("--policy", default=None,
+                        help="path to a customer policy pack (JSON) "
+                             "applied to every judgment")
     args = parser.parse_args(argv)
-    server = McpServer(Gate(operator=args.operator, ledger_path=args.ledger),
-                       ledger_path=args.ledger)
+    try:
+        gate = Gate(operator=args.operator, ledger_path=args.ledger,
+                    policy=args.policy)
+    except PolicyError as exc:
+        # Fail closed: no law loaded, no server. Diagnostics go to
+        # stderr; stdout belongs to the protocol alone.
+        print(f"witness-gate: refusing to start: {exc}", file=sys.stderr)
+        sys.exit(2)
+    server = McpServer(gate, ledger_path=args.ledger)
     for line in sys.stdin:
         line = line.strip()
         if not line:
