@@ -14,6 +14,48 @@ neither the package version nor the rubric version.
 A release that changes any verdict behavior says so in its entry, in
 plain words, before anything else.
 
+## 2026.5 (2026-11-27)
+
+An addition, not a correction. Verdict behavior is unchanged: the
+built-in rubrics, the panel logic, and the policy pack semantics
+are exactly as they were in 2026.4. This release widens the
+surfaces and the operator tooling around the same judgment.
+
+- Policy packs now configure on both servers. `witness-gate`
+  (HTTP) and `witness-gate-mcp` accept `--policy pack.json` at
+  startup, or a pack as a JSON object on a single request, which
+  judges that request only. `GET /policy` reports the pack a
+  server carries, and every response carries the applied pack's
+  name, version, and sha256. Packs are accepted as JSON objects,
+  never as file paths, on both surfaces. An invalid pack fails
+  closed: the server refuses to start, or the request is refused
+  with nothing judged.
+- New ledger reader: `witness-gate-ledger` (or
+  `python -m soul_cradle.ledger_report`) verifies a sealed
+  ledger's full hash chain, prints a one line verdict, and writes
+  a readable Markdown report, one section per entry, naming the
+  first broken entry when the chain fails. Its verification is
+  the library's own chain computation, exposed as
+  `verify_ledger_detailed` in `soul_cradle.plug`, so the reader
+  cannot disagree with `verify_ledger`.
+- Container form: a `Dockerfile` and `CONTAINER.md` ship the
+  HTTP service as a container, with the plain venv equivalent
+  documented alongside.
+- Benchmarks: `benchmarks/scale.py` with dated results in
+  `benchmarks/RESULTS-2026-11-27.md`: sustained 3,120 checks per
+  second (median 0.294 ms per sealed check) and ledger growth to
+  1,000,000 entries with a 69.9 second full verification,
+  measured on a throttled shared VM and labeled there as a floor
+  for real hardware, not a ceiling.
+- Paper ring: `DILIGENCE.md` (the verified facts about the gate,
+  with dates) and `SUPPORT.md` (support terms, headed as a draft
+  that is not in force), plus two starter policy packs,
+  `examples/policy-nist-ai-rmf.json` and
+  `examples/policy-eu-ai-act.json`, each labeled a starter
+  template, not legal advice.
+- Tests: 121 passing, up from 108 in 2026.4 (9 new server policy
+  tests, 4 new ledger reader tests).
+
 ## 2026.4 (2026-11-26)
 
 An addition, not a correction. Verdict behavior is unchanged for

@@ -115,11 +115,12 @@ pip install git+https://github.com/MytharaLabsLLC/witness-gate
 ```
 
 That installs the `soul_cradle` package (the Gate, the panel, the
-ledger tools) plus six commands: `witness-gate` (the HTTP service),
+ledger tools) plus seven commands: `witness-gate` (the HTTP service),
 `witness-gate-mcp` (the MCP server), `witness-gate-review` and
 `witness-gate-review-web` (the review consoles),
-`witness-gate-export` (the ledger exporter), and
-`witness-gate-anchor` (the ledger anchor). `examples/quickstart.py`
+`witness-gate-export` (the ledger exporter),
+`witness-gate-anchor` (the ledger anchor), and
+`witness-gate-ledger` (the ledger reader). `examples/quickstart.py`
 is the whole SDK in one file: decorate, call, done. A separate Gate
 instance per agent gives each agent its own operator name, ledger,
 and default evidence; that is the per-agent policy surface.
@@ -197,6 +198,17 @@ agent gets four tools: `witness_gate_assess`,
 `witness_gate_rubrics`. Worked clients for curl, JavaScript/
 TypeScript, and Go live in `examples/clients.md`.
 
+Policy packs apply on both surfaces, with the same semantics as the
+Python API. Start either server with `--policy customer-policy.json`
+and the pack judges every request; `GET /policy` reports the pack a
+server carries. Or send one pack as a JSON object in a single
+request's `policy` field (an HTTP body field, or the
+`witness_gate_assess` tool's `policy` argument) and it judges that
+request only. The applied pack's name, version, and sha256 come back
+in the response's `policy` field and are sealed into the ledger
+entry. An invalid pack fails closed on both surfaces: the server
+refuses to start, or the request is refused with nothing judged.
+
 ## Framework adapters
 
 For the three frameworks agent builders reach for first,
@@ -239,6 +251,19 @@ own authenticated proxy.
 sealed ledger into the formats a logging or SIEM stack already eats,
 including OpenTelemetry-style log records. The chain is verified
 before anything is exported; a tampered ledger exports nothing.
+
+## Reading a ledger
+
+For the human holding the ledger, `witness-gate-ledger <ledger>`
+(or `python -m soul_cradle.ledger_report <ledger>`) verifies the
+full hash chain, prints a one line verdict, and writes a readable
+Markdown report: one section per entry with its time, operator,
+action, verdict, findings, dissent, and the policy pack identity
+where one was recorded. Add `--out report.md` to save the report
+to a file. The exit status is 0 when the chain is intact and 1
+when it is broken, and a broken chain is reported with the index
+of the first entry that fails, so an auditor can see exactly
+where the record stops being trustworthy.
 
 ## Anchoring the ledger
 
