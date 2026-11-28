@@ -1,0 +1,37 @@
+{
+  "throughput": {
+    "checks": 93621,
+    "window_seconds": 30.0,
+    "checks_per_second": 3120.7,
+    "mean_ms": 0.32,
+    "p95_ms": 0.437,
+    "median_ms": 0.294,
+    "max_ms": 146.079
+  },
+  "growth": [
+    {
+      "entries": 10000,
+      "append_total_seconds": 3.21,
+      "append_ms_per_entry": 0.321,
+      "verify_seconds": 0.75,
+      "verify_ok": true,
+      "file_bytes": 39468826
+    },
+    {
+      "entries": 100000,
+      "append_total_seconds": 32.7,
+      "append_ms_per_entry": 0.327,
+      "verify_seconds": 7.57,
+      "verify_ok": true,
+      "file_bytes": 394788826
+    },
+    {
+      "entries": 1000000,
+      "append_total_seconds": 324.79,
+      "append_ms_per_entry": 0.325,
+      "verify_seconds": 69.93,
+      "verify_ok": true,
+      "file_bytes": 3948888826
+    }
+  ]
+}
